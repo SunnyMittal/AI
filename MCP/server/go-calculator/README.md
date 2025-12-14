@@ -317,6 +317,12 @@ Divides the first number by the second.
 
 ## Testing
 
+### Clear test results
+
+```powershell
+go clean -testcache
+```
+
 ### Run All Tests
 
 ```bash
