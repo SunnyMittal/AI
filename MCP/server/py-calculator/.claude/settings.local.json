@@ -3,7 +3,8 @@
     "allow": [
       "Bash(tree:*)",
       "Bash(findstr:*)",
-      "Bash(dir /S /B:*)"
+      "Bash(dir /S /B:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
