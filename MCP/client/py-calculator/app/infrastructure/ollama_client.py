@@ -34,7 +34,7 @@ class OllamaClientImpl:
 
         Args:
             host: Ollama API host URL
-            model: Model name to use (e.g., "codellama:34b-instruct")
+            model: Model name to use (e.g., "llama3.1:8b")
         """
         self.host = host
         self.model = model

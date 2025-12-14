@@ -1,14 +1,14 @@
 """Integration tests for end-to-end chat flow.
 
 NOTE: These tests require:
-1. Calculator MCP server running
-2. Ollama running with codellama:34b-instruct model
+1. Calculator MCP server running at MCP_SERVER_URL (default: http://127.0.0.1:8000/mcp)
+2. Ollama running with llama3.1:8b model
 """
 
 import pytest
 
 from app.config import get_settings
-from app.infrastructure.mcp_client import StdioMCPClient
+from app.infrastructure.mcp_client import HttpMCPClient
 from app.infrastructure.ollama_client import OllamaClientImpl
 from app.infrastructure.tool_registry import ToolRegistry
 from app.services.chat_service import ChatService
@@ -20,9 +20,8 @@ async def chat_service():
     """Create and initialize a chat service for testing."""
     settings = get_settings()
 
-    mcp_client = StdioMCPClient(
-        server_path=settings.mcp_server_path,
-        python_path=settings.mcp_python_path,
+    mcp_client = HttpMCPClient(
+        server_url=settings.mcp_server_url,
     )
 
     ollama_client = OllamaClientImpl(

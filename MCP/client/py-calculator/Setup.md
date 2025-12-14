@@ -1,5 +1,5 @@
 Create a python based MCP web Client for calculator MCP server at D:\AI\MCP\server\calculator such that it
-- uses ollama based local llm model codellama:34b-instruct model
+- uses ollama based local llm model llama3.1:8b model
 - has a chat interface where user is able to provide input
 - can pass user input to llm to determine which tool to execute on the mcp server
 - can call the right MCP tools

@@ -4,7 +4,7 @@ A Python-based web client for the Calculator MCP server that uses Ollama's CodeL
 
 ## Features
 
-- **Intelligent Tool Selection**: Uses Ollama's `codellama:34b-instruct` model to determine which calculator operation to execute based on natural language input
+- **Intelligent Tool Selection**: Uses Ollama's `llama3.1:8b` model to determine which calculator operation to execute based on natural language input
 - **Real-time Chat Interface**: WebSocket-based streaming responses for a ChatGPT-like experience
 - **MCP Integration**: Connects to the Calculator MCP server using the stdio transport
 - **SOLID Architecture**: Clean, maintainable code following SOLID principles with dependency injection
@@ -100,7 +100,7 @@ MCP_PYTHON_PATH=D:/AI/MCP/server/calculator/.venv/Scripts/python.exe
 
 # Ollama Configuration
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=codellama:34b-instruct
+OLLAMA_MODEL=llama3.1:8b
 
 # Application Configuration
 LOG_LEVEL=INFO
@@ -133,10 +133,10 @@ Verify the model is available:
 ollama list
 ```
 
-If `codellama:34b-instruct` is not listed, pull it:
+If `llama3.1:8b` is not listed, pull it:
 
 ```bash
-ollama pull codellama:34b-instruct
+ollama pull llama3.1:8b
 ```
 
 ### 3. Start the Web Client
@@ -331,4 +331,4 @@ Contributions are welcome! Please ensure:
 - Built with [FastAPI](https://fastapi.tiangolo.com/)
 - Uses [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - Powered by [Ollama](https://ollama.ai/)
-- LLM: CodeLlama 34B Instruct
+- LLM: llama3.1 8b

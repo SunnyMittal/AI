@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     )
 
     ollama_model: str = Field(
-        default="codellama:34b-instruct", description="Ollama model to use for chat"
+        default="llama3.1:8b", description="Ollama model to use for chat"
     )
 
     log_level: str = Field(default="INFO", description="Logging level")
