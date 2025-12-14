@@ -53,6 +53,18 @@ The project follows SOLID principles:
 
 ## Testing
 
+Clear tests cached results
+
+```powershell
+pytest --cache-clear
+```
+
+Recursive delete all files and folder below a directory
+
+```powershell
+rmdir -r .\.pytest_cache\
+```
+
 Run tests using pytest:
 
 ```bash
