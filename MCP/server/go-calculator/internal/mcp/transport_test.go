@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/mcp/go-calculator/internal/logger"
@@ -15,6 +16,33 @@ import (
 func init() {
 	// Initialize logger for tests
 	_ = logger.Initialize("error", "console")
+}
+
+// Helper function to parse SSE response and extract JSON-RPC message
+func parseSSEResponse(body string) (*JSONRPCResponse, error) {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "data: ") {
+			jsonData := strings.TrimPrefix(line, "data: ")
+			var resp JSONRPCResponse
+			if err := json.Unmarshal([]byte(jsonData), &resp); err != nil {
+				return nil, err
+			}
+			return &resp, nil
+		}
+		// Also check if next line after "event: message" contains data
+		if strings.HasPrefix(line, "event: message") && i+1 < len(lines) {
+			if strings.HasPrefix(lines[i+1], "data: ") {
+				jsonData := strings.TrimPrefix(lines[i+1], "data: ")
+				var resp JSONRPCResponse
+				if err := json.Unmarshal([]byte(jsonData), &resp); err != nil {
+					return nil, err
+				}
+				return &resp, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("no SSE data found in response")
 }
 
 func TestTransport_HandleMessage_Initialize(t *testing.T) {
@@ -36,26 +64,34 @@ func TestTransport_HandleMessage_Initialize(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(initReq)
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
 
 	w := httptest.NewRecorder()
-	transport.handleMessage(w, req)
+	transport.handleMCPPost(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var resp JSONRPCResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
+	// Check session header is set
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+	if sessionID == "" {
+		t.Error("Expected session ID header to be set")
+	}
+
+	resp, err := parseSSEResponse(w.Body.String())
+	if err != nil {
+		t.Fatalf("Failed to parse SSE response: %v", err)
 	}
 
 	if resp.Error != nil {
 		t.Errorf("Expected no error, got: %v", resp.Error)
 	}
 
-	if resp.ID != initReq.ID {
+	// Compare IDs as strings since JSON unmarshaling may change types (int -> float64)
+	if fmt.Sprintf("%v", resp.ID) != fmt.Sprintf("%v", initReq.ID) {
 		t.Errorf("Expected ID %v, got %v", initReq.ID, resp.ID)
 	}
 }
@@ -64,26 +100,48 @@ func TestTransport_HandleMessage_ToolsList(t *testing.T) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
+	// First initialize to get session
+	initReq := JSONRPCRequest{
+		JSONRPC: JSONRPCVersion,
+		ID:      1,
+		Method:  MethodInitialize,
+		Params: json.RawMessage(`{
+			"protocolVersion": "2024-11-05",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0.0"}
+		}`),
+	}
+	body, _ := json.Marshal(initReq)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+
+	// Now test tools/list
 	listReq := JSONRPCRequest{
 		JSONRPC: JSONRPCVersion,
 		ID:      2,
 		Method:  MethodToolsList,
 	}
 
-	body, _ := json.Marshal(listReq)
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+	body, _ = json.Marshal(listReq)
+	req = httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set(HeaderMCPSessionID, sessionID)
 
-	w := httptest.NewRecorder()
-	transport.handleMessage(w, req)
+	w = httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var resp JSONRPCResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
+	resp, err := parseSSEResponse(w.Body.String())
+	if err != nil {
+		t.Fatalf("Failed to parse SSE response: %v", err)
 	}
 
 	if resp.Error != nil {
@@ -114,6 +172,26 @@ func TestTransport_HandleMessage_ToolsCall_Add(t *testing.T) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
+	// First initialize to get session
+	initReq := JSONRPCRequest{
+		JSONRPC: JSONRPCVersion,
+		ID:      1,
+		Method:  MethodInitialize,
+		Params: json.RawMessage(`{
+			"protocolVersion": "2024-11-05",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0.0"}
+		}`),
+	}
+	body, _ := json.Marshal(initReq)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+
+	// Now test tool call
 	callReq := JSONRPCRequest{
 		JSONRPC: JSONRPCVersion,
 		ID:      3,
@@ -127,20 +205,22 @@ func TestTransport_HandleMessage_ToolsCall_Add(t *testing.T) {
 		}`),
 	}
 
-	body, _ := json.Marshal(callReq)
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+	body, _ = json.Marshal(callReq)
+	req = httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set(HeaderMCPSessionID, sessionID)
 
-	w := httptest.NewRecorder()
-	transport.handleMessage(w, req)
+	w = httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var resp JSONRPCResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
+	resp, err := parseSSEResponse(w.Body.String())
+	if err != nil {
+		t.Fatalf("Failed to parse SSE response: %v", err)
 	}
 
 	if resp.Error != nil {
@@ -170,6 +250,25 @@ func TestTransport_HandleMessage_ToolsCall_Divide(t *testing.T) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
+	// First initialize to get session
+	initReq := JSONRPCRequest{
+		JSONRPC: JSONRPCVersion,
+		ID:      1,
+		Method:  MethodInitialize,
+		Params: json.RawMessage(`{
+			"protocolVersion": "2024-11-05",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0.0"}
+		}`),
+	}
+	body, _ := json.Marshal(initReq)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+
 	tests := []struct {
 		name        string
 		a           float64
@@ -198,14 +297,15 @@ func TestTransport_HandleMessage_ToolsCall_Divide(t *testing.T) {
 			}
 
 			body, _ := json.Marshal(callReq)
-			req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "text/event-stream")
+			req.Header.Set(HeaderMCPSessionID, sessionID)
 
 			w := httptest.NewRecorder()
-			transport.handleMessage(w, req)
+			transport.handleMCPPost(w, req)
 
-			var resp JSONRPCResponse
-			json.NewDecoder(w.Body).Decode(&resp)
+			resp, _ := parseSSEResponse(w.Body.String())
 
 			resultJSON, _ := json.Marshal(resp.Result)
 			var result ToolCallResult
@@ -230,19 +330,20 @@ func TestTransport_HandleMessage_InvalidJSON(t *testing.T) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader([]byte("invalid json")))
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
 
 	w := httptest.NewRecorder()
-	transport.handleMessage(w, req)
+	transport.handleMCPPost(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	var resp JSONRPCResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
+	resp, err := parseSSEResponse(w.Body.String())
+	if err != nil {
+		t.Fatalf("Failed to parse SSE response: %v", err)
 	}
 
 	if resp.Error == nil {
@@ -258,21 +359,41 @@ func TestTransport_HandleMessage_MethodNotFound(t *testing.T) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
+	// First initialize to get session
+	initReq := JSONRPCRequest{
+		JSONRPC: JSONRPCVersion,
+		ID:      1,
+		Method:  MethodInitialize,
+		Params: json.RawMessage(`{
+			"protocolVersion": "2024-11-05",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0.0"}
+		}`),
+	}
+	body, _ := json.Marshal(initReq)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+
 	callReq := JSONRPCRequest{
 		JSONRPC: JSONRPCVersion,
 		ID:      5,
 		Method:  "unknown_method",
 	}
 
-	body, _ := json.Marshal(callReq)
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+	body, _ = json.Marshal(callReq)
+	req = httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set(HeaderMCPSessionID, sessionID)
 
-	w := httptest.NewRecorder()
-	transport.handleMessage(w, req)
+	w = httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
 
-	var resp JSONRPCResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	resp, _ := parseSSEResponse(w.Body.String())
 
 	if resp.Error == nil {
 		t.Error("Expected error response for unknown method")
@@ -333,6 +454,25 @@ func TestTransport_ContextCancellation(t *testing.T) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
+	// First initialize to get session
+	initReq := JSONRPCRequest{
+		JSONRPC: JSONRPCVersion,
+		ID:      1,
+		Method:  MethodInitialize,
+		Params: json.RawMessage(`{
+			"protocolVersion": "2024-11-05",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0.0"}
+		}`),
+	}
+	body, _ := json.Marshal(initReq)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
@@ -346,13 +486,15 @@ func TestTransport_ContextCancellation(t *testing.T) {
 		}`),
 	}
 
-	body, _ := json.Marshal(callReq)
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+	body, _ = json.Marshal(callReq)
+	req = httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set(HeaderMCPSessionID, sessionID)
 
-	w := httptest.NewRecorder()
-	transport.handleMessage(w, req)
+	w = httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
 
 	// The request should still complete, but context cancellation is checked
 	if w.Code != http.StatusOK {
@@ -365,9 +507,28 @@ func BenchmarkTransport_ToolCall(b *testing.B) {
 	server := NewServer("test")
 	transport := NewTransport(server)
 
-	callReq := JSONRPCRequest{
+	// First initialize to get session
+	initReq := JSONRPCRequest{
 		JSONRPC: JSONRPCVersion,
 		ID:      1,
+		Method:  MethodInitialize,
+		Params: json.RawMessage(`{
+			"protocolVersion": "2024-11-05",
+			"capabilities": {},
+			"clientInfo": {"name": "test", "version": "1.0.0"}
+		}`),
+	}
+	body, _ := json.Marshal(initReq)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	transport.handleMCPPost(w, req)
+	sessionID := w.Header().Get(HeaderMCPSessionID)
+
+	callReq := JSONRPCRequest{
+		JSONRPC: JSONRPCVersion,
+		ID:      2,
 		Method:  MethodToolsCall,
 		Params: json.RawMessage(`{
 			"name": "add",
@@ -375,13 +536,15 @@ func BenchmarkTransport_ToolCall(b *testing.B) {
 		}`),
 	}
 
-	body, _ := json.Marshal(callReq)
+	body, _ = json.Marshal(callReq)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodPost, "/mcp/v1/messages", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set(HeaderMCPSessionID, sessionID)
 		w := httptest.NewRecorder()
-		transport.handleMessage(w, req)
+		transport.handleMCPPost(w, req)
 	}
 }
