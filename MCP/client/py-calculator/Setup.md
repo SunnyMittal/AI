@@ -11,3 +11,6 @@ Install dependencies
 
 Start the application
 >uvicorn app.main:app --reload
+
+generate a prompt to be able to generate such a client for consuming MCP servers again deterministically and accurately
+    write the document to /docs/regen.md file
