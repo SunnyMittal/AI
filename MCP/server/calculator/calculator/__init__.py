@@ -1,0 +1,1 @@
+"""Calculator MCP server package."""

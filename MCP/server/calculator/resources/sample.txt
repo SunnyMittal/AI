@@ -1,0 +1,9 @@
+# Sample calculation examples
+
+1 + 1 = 2
+10 - 5 = 5
+4 * 3 = 12
+15 / 3 = 5
+
+This is a sample resource file that can be used to demonstrate
+the calculator's basic operations.
