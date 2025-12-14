@@ -5,6 +5,15 @@ import "encoding/json"
 // JSONRPC version constant
 const JSONRPCVersion = "2.0"
 
+// MCP Protocol version (FastMCP compatible)
+const ProtocolVersion = "2025-03-26"
+
+// HTTP header names
+const (
+	HeaderMCPSessionID       = "mcp-session-id"
+	HeaderMCPProtocolVersion = "mcp-protocol-version"
+)
+
 // Message types
 const (
 	TypeRequest      = "request"

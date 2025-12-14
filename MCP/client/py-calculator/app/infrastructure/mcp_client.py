@@ -224,7 +224,7 @@ class HttpMCPClient:
 
             # Parse SSE response
             result = self._parse_sse_response(response.text)
-            if "error" in result:
+            if isinstance(result, dict) and "error" in result:
                 raise MCPConnectionError(f"Initialization failed: {result['error']}")
 
             # Send initialized notification (required by MCP protocol)
@@ -283,10 +283,23 @@ class HttpMCPClient:
         for line in lines:
             if line.startswith('data: '):
                 data_str = line[6:]  # Remove 'data: ' prefix
-                return json.loads(data_str)
+                try:
+                    result = json.loads(data_str)
+                    if isinstance(result, dict):
+                        return result
+                    # If not a dict, wrap it
+                    return {"result": result}
+                except json.JSONDecodeError:
+                    continue
 
         # If no data line found, try to parse the whole text as JSON
-        return json.loads(text)
+        try:
+            result = json.loads(text)
+            if isinstance(result, dict):
+                return result
+            return {"result": result}
+        except json.JSONDecodeError:
+            return {"error": {"message": f"Failed to parse response: {text[:100]}"}}
 
     async def list_tools(self) -> list[dict[str, Any]]:
         """List all available tools from the MCP server.
@@ -323,10 +336,10 @@ class HttpMCPClient:
 
             # Parse SSE response
             result = self._parse_sse_response(response.text)
-            if "error" in result:
+            if isinstance(result, dict) and "error" in result:
                 raise MCPConnectionError(f"Failed to list tools: {result['error']}")
 
-            tools_data = result.get("result", {}).get("tools", [])
+            tools_data = result.get("result", {}).get("tools", []) if isinstance(result, dict) else []
             tools = [
                 {
                     "name": tool["name"],
@@ -396,13 +409,15 @@ class HttpMCPClient:
 
             # Parse SSE response
             result = self._parse_sse_response(response.text)
-            if "error" in result:
-                error_msg = result["error"].get("message", str(result["error"]))
+            if isinstance(result, dict) and "error" in result:
+                error_msg = result["error"].get("message", str(result["error"])) if isinstance(result["error"], dict) else str(result["error"])
                 logger.error(f"Tool '{name}' returned error: {error_msg}")
                 return {"error": error_msg}
 
             # Extract the result from the JSON-RPC response
-            tool_result = result.get("result", {})
+            tool_result = result.get("result", {}) if isinstance(result, dict) else {}
+            if not isinstance(tool_result, dict):
+                return {"result": tool_result}
 
             # Handle content array format
             if "content" in tool_result:

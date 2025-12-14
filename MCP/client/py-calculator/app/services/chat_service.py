@@ -128,7 +128,7 @@ class ChatService:
             try:
                 result = await self._mcp.call_tool(tool_name, coerced_arguments)
 
-                if "error" in result:
+                if isinstance(result, dict) and "error" in result:
                     error_msg = result["error"]
                     logger.error(f"Tool execution error: {error_msg}")
                     yield f"Error executing {tool_name}: {error_msg}"

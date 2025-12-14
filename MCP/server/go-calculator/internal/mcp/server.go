@@ -144,7 +144,7 @@ func (s *Server) handleInitialize(req *JSONRPCRequest) *JSONRPCResponse {
 	)
 
 	result := InitializeResult{
-		ProtocolVersion: "2024-11-05",
+		ProtocolVersion: ProtocolVersion,
 		Capabilities: ServerCapabilities{
 			Tools: &ToolsCapability{
 				ListChanged: false,
