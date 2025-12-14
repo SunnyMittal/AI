@@ -59,7 +59,7 @@ The application follows a layered architecture with clear separation of concerns
 ### 1. Clone or navigate to the project directory
 
 ```bash
-cd D:\AI\MCP\client\calculator-client
+cd D:\AI\MCP\client\py-calculator
 ```
 
 ### 2. Create a virtual environment
@@ -142,14 +142,14 @@ ollama pull codellama:34b-instruct
 ### 3. Start the Web Client
 
 ```bash
-cd D:\AI\MCP\client\calculator-client
-uvicorn app.api.main:app --reload
+cd D:\AI\MCP\client\py-calculator
+uvicorn app.api.main:app --reload --port 8001
 ```
 
 Or run directly:
 
 ```bash
-python -m app.api.main
+python -m app.api.main --port 8001
 ```
 
 The application will start on `http://localhost:8000`
@@ -209,7 +209,7 @@ pytest --cov=app --cov-report=html
 ## Project Structure
 
 ```
-calculator-client/
+py-calculator/
 ├── app/
 │   ├── domain/                    # Core business entities
 │   │   ├── models.py              # Message, ToolCall, ToolResult

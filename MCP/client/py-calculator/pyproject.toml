@@ -1,5 +1,5 @@
 [project]
-name = "calculator-client"
+name = "py-calculator"
 version = "0.1.0"
 description = "MCP web client for calculator server with Ollama LLM integration"
 requires-python = ">=3.13"

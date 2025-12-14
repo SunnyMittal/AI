@@ -201,7 +201,7 @@ class HttpMCPClient:
                     "protocolVersion": "2024-11-05",
                     "capabilities": {},
                     "clientInfo": {
-                        "name": "calculator-client",
+                        "name": "py-calculator",
                         "version": "0.1.0"
                     }
                 }
