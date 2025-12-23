@@ -342,7 +342,7 @@ func (t *Transport) handleMCPDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleHealth returns server health status
-func (t *Transport) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (t *Transport) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	health := map[string]interface{}{
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -354,7 +354,7 @@ func (t *Transport) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleMetrics returns basic metrics
-func (t *Transport) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (t *Transport) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	t.mu.RLock()
 	activeConnections := len(t.connections)
 	t.mu.RUnlock()

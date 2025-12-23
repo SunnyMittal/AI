@@ -60,6 +60,30 @@ go-calculator/
 │   └── calculator/
 │       ├── calculator.go        # Calculator business logic
 │       └── calculator_test.go   # Unit tests with benchmarks
+├── tests/
+│   └── performance/
+│       ├── k6/
+│       │   ├── scenarios/
+│       │   │   ├── load-test.js         # Baseline load testing
+│       │   │   ├── stress-test.js       # Find breaking points
+│       │   │   ├── endurance-test.js    # Long-running stability
+│       │   │   ├── spike-test.js        # Sudden traffic spikes
+│       │   │   └── benchmark-tools.js   # Individual tool benchmarks
+│       │   └── lib/
+│       │       ├── mcp-client.js        # MCP protocol client for k6
+│       │       ├── test-data.js         # Test data generators
+│       │       └── thresholds.js        # Performance SLIs/SLOs
+│       ├── scripts/
+│       │   ├── run-load-test.ps1        # Load test runner (Windows)
+│       │   ├── run-load-test.sh         # Load test runner (Linux/macOS)
+│       │   ├── run-stress-test.ps1      # Stress test runner (Windows)
+│       │   ├── run-stress-test.sh       # Stress test runner (Linux/macOS)
+│       │   ├── run-endurance-test.ps1   # Endurance test runner (Windows)
+│       │   ├── run-endurance-test.sh    # Endurance test runner (Linux/macOS)
+│       │   ├── setup-k6.sh              # k6 setup script
+│       │   └── compare-results.sh       # Results comparison
+│       ├── results/             # Test results directory (gitignored)
+│       └── README.md            # Performance testing documentation
 ├── docs/
 │   └── USAGE.md                # API documentation
 ├── .env.example                # Example environment configuration
@@ -312,7 +336,76 @@ type LogConfig struct {
 - Verify SSE response format
 - Verify session management
 
-### 11. Create Documentation Files
+### 11. Implement Performance Tests with k6 (`tests/performance/`)
+
+**Prerequisites:**
+- Install k6 load testing tool
+- Windows: `choco install k6` or `winget install k6`
+- macOS: `brew install k6`
+- Linux: See [k6 installation docs](https://k6.io/docs/get-started/installation/)
+
+**MCP Client Library (`k6/lib/mcp-client.js`):**
+Create a k6-compatible MCP client with functions:
+- `initializeSession()` - Initialize MCP session and return session ID
+- `callTool(sessionId, toolName, args)` - Call a calculator tool
+- `deleteSession(sessionId)` - Clean up session
+- Parse SSE responses to extract JSON-RPC data
+
+**Test Data Library (`k6/lib/test-data.js`):**
+- Random number generators for test inputs
+- Operation selector for distributing load across all 4 operations
+
+**Thresholds Library (`k6/lib/thresholds.js`):**
+Define performance SLIs/SLOs:
+- p95 latency < 100ms (stretch: < 75ms)
+- p99 latency < 200ms (stretch: < 150ms)
+- Throughput > 1000 req/s (stretch: > 2000 req/s)
+- Error rate < 0.1% (stretch: < 0.05%)
+
+**Test Scenarios:**
+
+1. **Load Test (`scenarios/load-test.js`):**
+   - Duration: ~14 minutes
+   - Purpose: Baseline performance under normal/peak load
+   - Profile: Ramp 0→50→100 VUs with sustain periods
+   - Success criteria: p95 < 100ms, throughput > 1000 req/s
+
+2. **Stress Test (`scenarios/stress-test.js`):**
+   - Duration: ~25 minutes
+   - Purpose: Find system breaking points
+   - Profile: Progressive ramp to 800 VUs
+   - Success criteria: Identify maximum capacity
+
+3. **Endurance Test (`scenarios/endurance-test.js`):**
+   - Duration: 2+ hours
+   - Purpose: Long-running stability, memory leak detection
+   - Profile: Sustain 50 VUs for 2 hours
+   - Success criteria: No memory leaks, stable performance
+
+4. **Spike Test (`scenarios/spike-test.js`):**
+   - Duration: ~12 minutes
+   - Purpose: Test recovery from sudden traffic bursts
+   - Profile: 5 cycles of 10→200→10 VUs
+   - Success criteria: Quick recovery, low error rate
+
+5. **Benchmark Test (`scenarios/benchmark-tools.js`):**
+   - Duration: ~5 minutes
+   - Purpose: Benchmark individual operations
+   - Profile: Isolated testing per operation (add, subtract, multiply, divide)
+   - Success criteria: Compare with Go micro-benchmarks
+
+**Runner Scripts:**
+Create both PowerShell (.ps1) and Bash (.sh) scripts for:
+- `run-load-test` - Start server, run load test, save results
+- `run-stress-test` - Start server, run stress test, save results
+- `run-endurance-test` - Start server, run 2+ hour test, save results
+- Scripts should handle server startup/shutdown and output results to timestamped files
+
+**Results Directory:**
+- Create `tests/performance/results/` with `.gitkeep`
+- Results saved with timestamps: `load-YYYYMMDD-HHMMSS.json`
+
+### 12. Create Documentation Files
 
 **.env.example:**
 ```
@@ -454,6 +547,9 @@ Before considering implementation complete, verify:
 - [ ] All 4 calculator operations work correctly
 - [ ] Division by zero returns error in isError format
 - [ ] SSE responses are properly formatted
+- [ ] k6 is installed and available
+- [ ] Quick load test passes: `k6 run --duration 30s --vus 10 tests/performance/k6/scenarios/load-test.js`
+- [ ] Performance targets met: p95 < 100ms, error rate < 0.1%
 
 ---
 
@@ -500,6 +596,36 @@ curl -X POST http://localhost:8000/mcp \
   -i
 
 # Extract session ID from response header and use for subsequent requests
+
+# Performance Testing with k6
+
+# Install k6 (Windows)
+choco install k6
+# or: winget install k6
+
+# Install k6 (macOS)
+brew install k6
+
+# Quick 30-second load test
+k6 run --duration 30s --vus 10 tests/performance/k6/scenarios/load-test.js
+
+# Full load test (~14 minutes) - Windows
+.\tests\performance\scripts\run-load-test.ps1
+
+# Full load test (~14 minutes) - Linux/macOS
+bash tests/performance/scripts/run-load-test.sh
+
+# Stress test (~25 minutes) - Windows
+.\tests\performance\scripts\run-stress-test.ps1
+
+# Stress test (~25 minutes) - Linux/macOS
+bash tests/performance/scripts/run-stress-test.sh
+
+# Benchmark individual operations
+k6 run tests/performance/k6/scenarios/benchmark-tools.js
+
+# Spike test
+k6 run tests/performance/k6/scenarios/spike-test.js
 ```
 
 ---
@@ -518,6 +644,11 @@ The implementation is complete and correct when:
 8. **Session Management**: Correctly handles session creation, validation, and termination
 9. **SSE Transport**: Properly formats responses in Server-Sent Events format
 10. **Error Handling**: Returns proper JSON-RPC error codes and descriptive messages
+11. **Performance Testing**: k6 performance tests pass with:
+    - p95 latency < 100ms under load
+    - Error rate < 0.1%
+    - Server handles 100+ concurrent users
+    - All 5 test scenarios (load, stress, endurance, spike, benchmark) available
 
 ---
 
@@ -550,11 +681,14 @@ Once base implementation is complete, consider adding:
 - API authentication and authorization
 - Request/response caching
 - Multiple calculator instances with load balancing
+- HTML performance reports generation from k6 results
+- Automated performance regression detection in CI
 
 ---
 
 ## Version History
 
+- **1.1.0**: Added comprehensive k6 performance testing suite with load, stress, endurance, spike, and benchmark tests. Cross-platform support (Windows PowerShell and Linux/macOS Bash scripts).
 - **1.0.0**: Initial implementation with 4 calculator tools, FastMCP-compatible session management, SSE transport
 
 ---
