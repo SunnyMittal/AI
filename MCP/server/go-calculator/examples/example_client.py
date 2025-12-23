@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 class MCPClient:
     """Client for interacting with MCP Calculator Server"""
 
-    def __init__(self, base_url: str = "http://localhost:8080"):
+    def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url
         self.messages_url = f"{base_url}/mcp/v1/messages"
         self.request_id = 0

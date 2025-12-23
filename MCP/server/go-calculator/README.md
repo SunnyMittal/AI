@@ -94,7 +94,7 @@ The server can be configured using environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SERVER_PORT` | `8080` | Port to listen on |
+| `SERVER_PORT` | `8000` | Port to listen on |
 | `SERVER_HOST` | `localhost` | Host to bind to |
 | `SERVER_READ_TIMEOUT` | `15s` | HTTP read timeout |
 | `SERVER_WRITE_TIMEOUT` | `15s` | HTTP write timeout |
@@ -137,14 +137,14 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 COPY --from=builder /app/server .
-EXPOSE 8080
+EXPOSE 8000
 CMD ["./server"]
 ```
 
 Build and run:
 ```bash
 docker build -t go-calculator .
-docker run -p 8080:8080 go-calculator
+docker run -p 8000:8000 go-calculator
 ```
 
 ## API Documentation
@@ -428,7 +428,7 @@ Logs are output in JSON format (configurable to console):
 Access metrics at `GET /metrics`:
 
 ```bash
-curl http://localhost:8080/metrics
+curl http://localhost:8000/metrics
 ```
 
 ### Health Checks
@@ -436,7 +436,7 @@ curl http://localhost:8080/metrics
 Monitor server health:
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8000/health
 ```
 
 ## Graceful Shutdown
@@ -495,7 +495,7 @@ golangci-lint run
 
 ### Server won't start
 
-- Check if port is already in use: `lsof -i :8080` (Unix) or `netstat -ano | findstr :8080` (Windows)
+- Check if port is already in use: `lsof -i :8000` (Unix) or `netstat -ano | findstr :8000` (Windows)
 - Verify configuration in `.env` file
 - Check logs for detailed error messages
 

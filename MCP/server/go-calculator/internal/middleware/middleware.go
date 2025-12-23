@@ -3,6 +3,8 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/mcp/go-calculator/internal/logger"
@@ -68,17 +70,31 @@ func Recovery(next http.Handler) http.Handler {
 }
 
 // Timeout middleware adds a timeout to requests
+// Note: This middleware should NOT be used for SSE/streaming endpoints
 func Timeout(duration time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip timeout for SSE requests (they are long-lived by design)
+			accept := r.Header.Get("Accept")
+			if strings.Contains(accept, "text/event-stream") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			ctx, cancel := context.WithTimeout(r.Context(), duration)
 			defer cancel()
 
 			r = r.WithContext(ctx)
 
+			// Use a timeout-aware response writer to prevent race conditions
+			tw := &timeoutWriter{
+				ResponseWriter: w,
+				mu:             &sync.Mutex{},
+			}
+
 			done := make(chan struct{})
 			go func() {
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(tw, r)
 				close(done)
 			}()
 
@@ -86,16 +102,62 @@ func Timeout(duration time.Duration) func(http.Handler) http.Handler {
 			case <-done:
 				// Request completed successfully
 			case <-ctx.Done():
-				if ctx.Err() == context.DeadlineExceeded {
+				tw.mu.Lock()
+				defer tw.mu.Unlock()
+				if !tw.wroteHeader {
+					tw.timedOut = true
 					logger.Warn("request timeout",
 						zap.String("method", r.Method),
 						zap.String("path", r.URL.Path),
 						zap.Duration("timeout", duration),
 					)
-					http.Error(w, "Request timeout", http.StatusGatewayTimeout)
+					w.WriteHeader(http.StatusGatewayTimeout)
+					w.Write([]byte("Request timeout"))
 				}
 			}
 		})
+	}
+}
+
+// timeoutWriter wraps ResponseWriter to handle timeout race conditions
+type timeoutWriter struct {
+	http.ResponseWriter
+	mu          *sync.Mutex
+	wroteHeader bool
+	timedOut    bool
+}
+
+func (tw *timeoutWriter) WriteHeader(code int) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if tw.timedOut || tw.wroteHeader {
+		return
+	}
+	tw.wroteHeader = true
+	tw.ResponseWriter.WriteHeader(code)
+}
+
+func (tw *timeoutWriter) Write(b []byte) (int, error) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if tw.timedOut {
+		return 0, context.DeadlineExceeded
+	}
+	if !tw.wroteHeader {
+		tw.wroteHeader = true
+		tw.ResponseWriter.WriteHeader(http.StatusOK)
+	}
+	return tw.ResponseWriter.Write(b)
+}
+
+func (tw *timeoutWriter) Flush() {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	if tw.timedOut {
+		return
+	}
+	if f, ok := tw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
 	}
 }
 
@@ -107,18 +169,21 @@ func RateLimiter(requestsPerSecond int) func(http.Handler) http.Handler {
 		resetTime time.Time
 	}
 
+	var mu sync.RWMutex
 	clients := make(map[string]*client)
 	ticker := time.NewTicker(time.Minute)
 
 	// Cleanup old entries periodically
 	go func() {
 		for range ticker.C {
+			mu.Lock()
 			cutoff := time.Now().Add(-5 * time.Minute)
 			for ip, c := range clients {
 				if c.lastSeen.Before(cutoff) {
 					delete(clients, ip)
 				}
 			}
+			mu.Unlock()
 		}
 	}()
 
@@ -127,6 +192,7 @@ func RateLimiter(requestsPerSecond int) func(http.Handler) http.Handler {
 			ip := r.RemoteAddr
 			now := time.Now()
 
+			mu.Lock()
 			c, exists := clients[ip]
 			if !exists {
 				clients[ip] = &client{
@@ -134,6 +200,7 @@ func RateLimiter(requestsPerSecond int) func(http.Handler) http.Handler {
 					requests:  1,
 					resetTime: now.Add(time.Second),
 				}
+				mu.Unlock()
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -144,12 +211,14 @@ func RateLimiter(requestsPerSecond int) func(http.Handler) http.Handler {
 			if now.After(c.resetTime) {
 				c.requests = 1
 				c.resetTime = now.Add(time.Second)
+				mu.Unlock()
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			// Check rate limit
 			if c.requests >= requestsPerSecond {
+				mu.Unlock()
 				logger.Warn("rate limit exceeded",
 					zap.String("ip", ip),
 					zap.Int("requests", c.requests),
@@ -159,6 +228,7 @@ func RateLimiter(requestsPerSecond int) func(http.Handler) http.Handler {
 			}
 
 			c.requests++
+			mu.Unlock()
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -234,4 +304,11 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Flush implements http.Flusher interface for SSE support
+func (rw *responseWriter) Flush() {
+	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }

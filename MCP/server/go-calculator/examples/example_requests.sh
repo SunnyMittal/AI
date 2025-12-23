@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Example MCP requests for the Go Calculator server
-# Make sure the server is running on http://localhost:8080
+# Make sure the server is running on http://localhost:8000
 
-BASE_URL="http://localhost:8080/mcp/v1/messages"
+BASE_URL="http://localhost:8000/mcp/v1/messages"
 
 echo "========================================="
 echo "Go Calculator MCP Server - Example Requests"
@@ -12,7 +12,7 @@ echo ""
 
 # Check if server is running
 echo "1. Checking server health..."
-curl -s http://localhost:8080/health | jq '.'
+curl -s http://localhost:8000/health | jq '.'
 echo ""
 
 # Initialize MCP session
@@ -155,7 +155,7 @@ echo ""
 
 # Check metrics
 echo "10. Checking server metrics..."
-curl -s http://localhost:8080/metrics | jq '.'
+curl -s http://localhost:8000/metrics | jq '.'
 echo ""
 
 echo "========================================="

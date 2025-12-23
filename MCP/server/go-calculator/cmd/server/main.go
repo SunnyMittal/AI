@@ -55,7 +55,7 @@ func run() int {
 		middleware.Recovery,
 		middleware.SecurityHeaders,
 		middleware.RequestValidator(1<<20), // 1MB max body size
-		middleware.RateLimiter(100),        // 100 requests per second
+		middleware.RateLimiter(10000),      // 10,000 requests per second
 		middleware.Timeout(30*time.Second),
 	)
 

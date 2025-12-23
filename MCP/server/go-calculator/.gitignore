@@ -30,3 +30,16 @@ go.work
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+bin/
+coverage.html
+
+# Performance testing artifacts
+tests/performance/k6/reports/
+tests/performance/results/*.json
+tests/performance/results/*.txt
+!tests/performance/results/.gitkeep
+
+# Logs
+*.log

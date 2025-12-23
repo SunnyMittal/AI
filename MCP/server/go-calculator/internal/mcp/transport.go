@@ -371,15 +371,16 @@ func (t *Transport) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 // sendSSEResponse sends a JSON-RPC response in SSE format (FastMCP compatible)
 func (t *Transport) sendSSEResponse(w http.ResponseWriter, sessionID string, data interface{}) {
-	// Set SSE headers
+	// Set SSE headers - must be set before WriteHeader
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	if sessionID != "" {
 		w.Header().Set(HeaderMCPSessionID, sessionID)
 	}
 
-	// Marshal the response
+	// Marshal the response first to check for errors before writing headers
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		logger.Error("failed to marshal response", zap.Error(err))
@@ -387,18 +388,15 @@ func (t *Transport) sendSSEResponse(w http.ResponseWriter, sessionID string, dat
 		return
 	}
 
+	// Explicitly write status header to prevent Go from auto-setting Content-Length
+	w.WriteHeader(http.StatusOK)
+
 	// Write SSE format: event: message\ndata: {...}\n\n
-	writer := bufio.NewWriter(w)
-	fmt.Fprintf(writer, "event: message\n")
-	fmt.Fprintf(writer, "data: %s\n", string(jsonData))
-	fmt.Fprintf(writer, "\n")
+	fmt.Fprintf(w, "event: message\n")
+	fmt.Fprintf(w, "data: %s\n", string(jsonData))
+	fmt.Fprintf(w, "\n")
 
-	if err := writer.Flush(); err != nil {
-		logger.Error("failed to flush SSE response", zap.Error(err))
-		return
-	}
-
-	// Flush the http response if possible
+	// Flush the http response to send immediately
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()
 	}
