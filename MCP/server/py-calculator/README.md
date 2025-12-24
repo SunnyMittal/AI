@@ -53,6 +53,8 @@ The project follows SOLID principles:
 
 ## Testing
 
+### Unit Tests
+
 Clear tests cached results
 
 ```powershell
@@ -70,6 +72,57 @@ Run tests using pytest:
 ```bash
 pytest
 ```
+
+### Performance Tests
+
+Comprehensive performance testing suite using k6 to validate server performance under various load conditions.
+
+**Quick Start**:
+
+1. Install k6:
+   ```bash
+   # Windows
+   choco install k6
+   # or
+   winget install k6
+
+   # macOS
+   brew install k6
+
+   # Linux
+   bash tests/performance/scripts/setup-k6.sh
+   ```
+
+2. Start the server:
+   ```bash
+   uv run python -m calculator.server
+   ```
+
+3. Run performance tests:
+   ```bash
+   # Windows PowerShell
+   .\tests\performance\scripts\run-quick-test.ps1
+
+   # Linux/macOS
+   bash tests/performance/scripts/run-quick-test.sh
+   ```
+
+**Available Tests**:
+- **Quick Test** (30s): Fast smoke test for CI/CD
+- **Load Test** (~14m): Baseline performance validation
+- **Stress Test** (~20m): Find system breaking points
+- **Endurance Test** (~2h): Memory leak detection
+- **Spike Test** (~12m): Traffic burst recovery
+- **Benchmark Test** (~5m): Individual operation performance
+
+**Performance Targets**:
+- p95 Latency: < 100ms
+- Throughput: > 1000 req/s
+- Error Rate: < 0.1%
+
+For detailed documentation, see:
+- [Performance Testing Guide](docs/performance-test.md)
+- [Performance Tests README](tests/performance/README.md)
 
 ## License
 

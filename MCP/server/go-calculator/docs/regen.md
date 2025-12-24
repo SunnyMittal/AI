@@ -54,8 +54,10 @@ go-calculator/
 │   │   ├── server.go            # MCP server logic and tool handlers
 │   │   ├── transport.go         # HTTP/SSE transport with session management
 │   │   └── transport_test.go    # Integration tests for transport
-│   └── middleware/
-│       └── middleware.go        # HTTP middleware (logging, security, rate limiting)
+│   ├── middleware/
+│   │   └── middleware.go        # HTTP middleware (logging, security, rate limiting)
+│   └── telemetry/
+│       └── telemetry.go         # OpenTelemetry instrumentation with Phoenix
 ├── pkg/
 │   └── calculator/
 │       ├── calculator.go        # Calculator business logic
@@ -405,7 +407,277 @@ Create both PowerShell (.ps1) and Bash (.sh) scripts for:
 - Create `tests/performance/results/` with `.gitkeep`
 - Results saved with timestamps: `load-YYYYMMDD-HHMMSS.json`
 
-### 12. Create Documentation Files
+### 12. Implement Observability with OpenTelemetry and Phoenix (`internal/telemetry/`)
+
+**Dependencies:**
+Add to `go.mod`:
+```bash
+go get go.opentelemetry.io/otel
+go get go.opentelemetry.io/otel/sdk
+go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+go get go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
+go get go.opentelemetry.io/otel/trace
+```
+
+**Configuration Integration (`internal/config/config.go`):**
+
+Add telemetry configuration to the Config struct:
+```go
+// TelemetryConfig holds observability configuration
+type TelemetryConfig struct {
+    PhoenixEndpoint string
+    ProjectName     string
+}
+
+// Add to main Config struct
+type Config struct {
+    Server    ServerConfig
+    Log       LogConfig
+    API       APIConfig
+    Telemetry TelemetryConfig  // Add this
+}
+```
+
+Load from environment in `Load()` function:
+```go
+Telemetry: TelemetryConfig{
+    PhoenixEndpoint: getEnvOrDefault("PHOENIX_ENDPOINT", "http://localhost:6006"),
+    ProjectName:     getEnvOrDefault("PHOENIX_PROJECT_NAME", "go-calculator"),
+},
+```
+
+**Telemetry Package (`internal/telemetry/telemetry.go`):**
+
+Create comprehensive telemetry package with:
+
+1. **Config Structure:**
+```go
+type Config struct {
+    ServiceName     string
+    ServiceVersion  string
+    PhoenixEndpoint string
+    ProjectName     string
+}
+```
+
+2. **LoadConfig Function:**
+```go
+func LoadConfig(serviceName, version, endpoint, projectName string) Config {
+    endpoint = strings.TrimSuffix(endpoint, "/")
+    return Config{
+        ServiceName:     serviceName,
+        ServiceVersion:  version,
+        PhoenixEndpoint: endpoint,
+        ProjectName:     projectName,
+    }
+}
+```
+
+3. **Phoenix Health Check & Project Management:**
+```go
+func ensureProjectExists(ctx context.Context, phoenixURL, projectName string) error {
+    // Verify Phoenix is reachable
+    // Phoenix auto-creates projects via x-project-name header
+    // Health check implementation:
+    // - GET request to Phoenix base URL
+    // - 5 second timeout
+    // - Return error if not reachable (warn, don't fail server)
+}
+```
+
+4. **OpenTelemetry Initialization:**
+```go
+func Initialize(ctx context.Context, cfg Config) (func(context.Context) error, error) {
+    // 1. Check Phoenix availability
+    if err := ensureProjectExists(ctx, cfg.PhoenixEndpoint, cfg.ProjectName); err != nil {
+        return nil, fmt.Errorf("Phoenix project check failed: %w", err)
+    }
+
+    // 2. Create OTLP HTTP exporter with Phoenix headers
+    endpoint := strings.TrimPrefix(cfg.PhoenixEndpoint, "http://")
+    endpoint = strings.TrimPrefix(endpoint, "https://")
+
+    headers := map[string]string{}
+    if cfg.ProjectName != "" {
+        headers["x-project-name"] = cfg.ProjectName  // Critical for project routing
+    }
+
+    exporter, err := otlptracehttp.New(ctx,
+        otlptracehttp.WithEndpoint(endpoint),
+        otlptracehttp.WithURLPath("/v1/traces"),
+        otlptracehttp.WithInsecure(),
+        otlptracehttp.WithHeaders(headers),  // Project name header
+    )
+
+    // 3. Create resource with service metadata
+    res, err := resource.New(ctx,
+        resource.WithAttributes(
+            semconv.ServiceName(cfg.ServiceName),
+            semconv.ServiceVersion(cfg.ServiceVersion),
+            attribute.String("mcp.protocol_version", "2025-03-26"),
+            attribute.String("phoenix.project", cfg.ProjectName),
+        ),
+    )
+
+    // 4. Create TracerProvider with batching
+    tp := sdktrace.NewTracerProvider(
+        sdktrace.WithBatcher(exporter),
+        sdktrace.WithResource(res),
+        sdktrace.WithSampler(sdktrace.AlwaysSample()),
+    )
+
+    // 5. Set global providers
+    otel.SetTracerProvider(tp)
+    otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+        propagation.TraceContext{},
+        propagation.Baggage{},
+    ))
+
+    // Return shutdown function
+    return tp.Shutdown, nil
+}
+```
+
+5. **Tracer Helper:**
+```go
+func Tracer(name string) trace.Tracer {
+    return otel.Tracer(name)
+}
+```
+
+**HTTP Instrumentation (`internal/mcp/transport.go`):**
+
+Add otelhttp wrapper:
+```go
+import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
+// Handler returns an instrumented HTTP handler
+func (t *Transport) Handler() http.Handler {
+    return otelhttp.NewHandler(t, "mcp-server",
+        otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+            return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+        }),
+    )
+}
+```
+
+**MCP Server Instrumentation (`internal/mcp/server.go`):**
+
+Add tracing to request handlers:
+```go
+import (
+    "github.com/mcp/go-calculator/internal/telemetry"
+    "go.opentelemetry.io/otel/attribute"
+    "go.opentelemetry.io/otel/codes"
+    "go.opentelemetry.io/otel/trace"
+)
+
+func (s *Server) HandleRequest(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+    tracer := telemetry.Tracer("go-calculator")
+    ctx, span := tracer.Start(ctx, "mcp.request",
+        trace.WithAttributes(
+            attribute.String("mcp.method", req.Method),
+            attribute.String("rpc.system", "jsonrpc"),
+            attribute.String("rpc.jsonrpc.version", JSONRPCVersion),
+        ),
+    )
+    defer span.End()
+
+    // Handler logic with error recording
+    // span.RecordError(err)
+    // span.SetStatus(codes.Error, "error message")
+}
+
+func (s *Server) handleToolsCall(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+    span := trace.SpanFromContext(ctx)
+
+    // Add tool-specific attributes
+    span.SetAttributes(
+        attribute.String("mcp.tool.name", params.Name),
+        attribute.Float64("mcp.tool.arg.a", a),
+        attribute.Float64("mcp.tool.arg.b", b),
+    )
+
+    // On success
+    span.SetAttributes(
+        attribute.Float64("mcp.tool.result", result),
+        attribute.Bool("mcp.tool.error", false),
+    )
+
+    // On error
+    span.RecordError(err)
+    span.SetStatus(codes.Error, "Tool execution failed")
+    span.SetAttributes(attribute.Bool("mcp.tool.error", true))
+}
+```
+
+**Main Application Integration (`cmd/server/main.go`):**
+
+```go
+import "github.com/mcp/go-calculator/internal/telemetry"
+
+func run() int {
+    // After config and logger initialization
+    ctx := context.Background()
+    telemetryCfg := telemetry.LoadConfig(
+        "go-calculator",
+        version,
+        cfg.Telemetry.PhoenixEndpoint,
+        cfg.Telemetry.ProjectName,
+    )
+
+    shutdownTelemetry, err := telemetry.Initialize(ctx, telemetryCfg)
+    if err != nil {
+        logger.Warn("failed to initialize telemetry, continuing without tracing",
+            zap.Error(err),
+        )
+    } else {
+        logger.Info("telemetry initialized",
+            zap.String("endpoint", telemetryCfg.PhoenixEndpoint),
+            zap.String("project", telemetryCfg.ProjectName),
+        )
+        defer func() {
+            shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+            defer cancel()
+            if err := shutdownTelemetry(shutdownCtx); err != nil {
+                logger.Error("failed to shutdown telemetry", zap.Error(err))
+            }
+        }()
+    }
+
+    // Use instrumented handler
+    handler := middleware.Chain(
+        transport.Handler(), // Wrapped with otelhttp
+        // ... other middleware
+    )
+}
+```
+
+**Trace Attributes Standard:**
+
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| `service.name` | Service identifier | `go-calculator` |
+| `service.version` | Semantic version | `1.0.0` |
+| `mcp.protocol_version` | MCP spec version | `2025-03-26` |
+| `mcp.method` | JSON-RPC method | `tools/call` |
+| `mcp.tool.name` | Tool being called | `add`, `divide` |
+| `mcp.tool.arg.a` | First operand | `5.0` |
+| `mcp.tool.arg.b` | Second operand | `3.0` |
+| `mcp.tool.result` | Calculation result | `8.0` |
+| `mcp.tool.error` | Error flag | `false` |
+| `mcp.client.name` | Client name | `test-client` |
+| `mcp.client.version` | Client version | `1.0.0` |
+
+**Testing Telemetry:**
+
+1. Start Phoenix: `phoenix serve` (or `docker run -p 6006:6006 arizephoenix/phoenix:latest`)
+2. Server logs should show: `telemetry initialized`
+3. Make MCP requests
+4. View traces at `http://localhost:6006`
+5. Verify traces appear under project "go-calculator"
+
+### 13. Create Documentation Files
 
 **.env.example:**
 ```
@@ -417,6 +689,8 @@ SERVER_IDLE_TIMEOUT=60s
 LOG_LEVEL=info
 LOG_ENCODING=json
 API_VERSION=v1
+PHOENIX_ENDPOINT=http://localhost:6006
+PHOENIX_PROJECT_NAME=go-calculator
 ```
 
 **.gitignore:**
@@ -550,6 +824,10 @@ Before considering implementation complete, verify:
 - [ ] k6 is installed and available
 - [ ] Quick load test passes: `k6 run --duration 30s --vus 10 tests/performance/k6/scenarios/load-test.js`
 - [ ] Performance targets met: p95 < 100ms, error rate < 0.1%
+- [ ] Phoenix is installed and running: `phoenix serve` or Docker
+- [ ] Telemetry initializes successfully (check server logs)
+- [ ] Traces appear in Phoenix UI at `http://localhost:6006`
+- [ ] Traces are routed to correct project (go-calculator)
 
 ---
 
@@ -649,6 +927,14 @@ The implementation is complete and correct when:
     - Error rate < 0.1%
     - Server handles 100+ concurrent users
     - All 5 test scenarios (load, stress, endurance, spike, benchmark) available
+12. **Observability**: OpenTelemetry tracing with Phoenix integration:
+    - Telemetry package properly configured and initialized
+    - Phoenix health check passes on startup
+    - Traces sent to correct project via `x-project-name` header
+    - HTTP requests instrumented with otelhttp
+    - MCP handlers traced with custom attributes
+    - Trace context propagated through request lifecycle
+    - Graceful telemetry shutdown on server termination
 
 ---
 
@@ -664,6 +950,10 @@ The implementation is complete and correct when:
 8. **Don't** return 200 for errors - use appropriate HTTP status codes
 9. **Don't** ignore context cancellation - check and return appropriate errors
 10. **Don't** forget CORS headers - required for browser-based clients
+11. **Don't** forget to add `x-project-name` header to OTLP exporter - Phoenix needs this for project routing
+12. **Don't** hard-code Phoenix endpoint - always load from configuration
+13. **Don't** fail server startup if Phoenix is unavailable - log warning and continue
+14. **Don't** forget to pass context through instrumented handlers - needed for span propagation
 
 ---
 

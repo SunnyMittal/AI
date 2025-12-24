@@ -13,6 +13,7 @@ import (
 	"github.com/mcp/go-calculator/internal/logger"
 	"github.com/mcp/go-calculator/internal/mcp"
 	"github.com/mcp/go-calculator/internal/middleware"
+	"github.com/mcp/go-calculator/internal/telemetry"
 	"go.uber.org/zap"
 )
 
@@ -44,13 +45,40 @@ func run() int {
 		zap.String("log_level", cfg.Log.Level),
 	)
 
+	// Initialize telemetry (OpenTelemetry with Phoenix)
+	ctx := context.Background()
+	telemetryCfg := telemetry.LoadConfig(
+		"go-calculator",
+		version,
+		cfg.Telemetry.PhoenixEndpoint,
+		cfg.Telemetry.ProjectName,
+	)
+	shutdownTelemetry, err := telemetry.Initialize(ctx, telemetryCfg)
+	if err != nil {
+		logger.Warn("failed to initialize telemetry, continuing without tracing",
+			zap.Error(err),
+		)
+	} else {
+		logger.Info("telemetry initialized",
+			zap.String("endpoint", telemetryCfg.PhoenixEndpoint),
+			zap.String("project", telemetryCfg.ProjectName),
+		)
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownTelemetry(shutdownCtx); err != nil {
+				logger.Error("failed to shutdown telemetry", zap.Error(err))
+			}
+		}()
+	}
+
 	// Create MCP server
 	mcpServer := mcp.NewServer(version)
 	transport := mcp.NewTransport(mcpServer)
 
-	// Build middleware chain
+	// Build middleware chain with instrumented handler
 	handler := middleware.Chain(
-		transport,
+		transport.Handler(), // Use instrumented handler for OpenTelemetry tracing
 		middleware.Logging,
 		middleware.Recovery,
 		middleware.SecurityHeaders,

@@ -41,8 +41,8 @@ Create an MCP server in Go that:
 <!-- gave it permission to perform all edits and generate the project structure and files -->
 
 <!-- Prompt to include ObsMon in implementation -->
-    refer to the current golang project and documentation at
-    https://arize.com/docs/phoenix to prepare a plan on how we can implement
-    observability and monitoring consistently across all tools irrespective of the       
-    language used for it e.g. if the language is python as in
-    D:\AI\MCP\server\py-calculator
+refer to below to prepare a plan on how we can implement observability and monitoring consistently across all tools irrespective of the language used for it e.g. if the language is python as in: D:\AI\MCP\server\py-calculator
+    the current golang project 
+    documentation at: https://arize.com/docs/phoenix
+generate output plan document at this path: 
+    D:\AI\MCP\server\go-calculator\docs\obs-mon.md

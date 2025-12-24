@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Dict, Any
 
 from mcp.server.fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from calculator.calculator import Calculator
 
@@ -67,6 +69,12 @@ def divide(a: float | None = None, b: float | None = None) -> Dict[str, Any]:
 def sample_calculations() -> str:
     """Return the sample calculations text."""
     return sample_text
+
+# Add custom health endpoint for performance testing
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    """Health check endpoint for monitoring and performance testing."""
+    return JSONResponse({"status": "ok", "service": "calculator-mcp"})
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")

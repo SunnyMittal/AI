@@ -14,3 +14,11 @@ uv run python -m calculator.server
 
 generate a prompt to be able to generate such a MCP servers again deterministically and accurately
     write the document to /docs/regen.md file
+
+<!-- performance test implementation prompt -->
+refer to below documents and implement performance tests for py-calculator
+    D:\AI\MCP\server\go-calculator\docs\performance-test.md
+
+<!-- observability and monitoring prompt -->
+refer to below document and implement observability and monitoring for py-calculator to send the telemetry information to local instance of phoenix hosted at http://localhost:6006/
+    D:\AI\MCP\server\go-calculator\docs\obs-mon.md

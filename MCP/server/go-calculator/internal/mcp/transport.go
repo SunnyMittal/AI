@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mcp/go-calculator/internal/logger"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/zap"
 )
 
@@ -47,6 +48,15 @@ func NewTransport(server *Server) *Transport {
 		sessions:    make(map[string]*session),
 		connections: make(map[string]*sseConnection),
 	}
+}
+
+// Handler returns an instrumented HTTP handler with OpenTelemetry tracing
+func (t *Transport) Handler() http.Handler {
+	return otelhttp.NewHandler(t, "mcp-server",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+		}),
+	)
 }
 
 // generateSessionID generates a new unique session ID (32 hex characters like FastMCP)

@@ -1,0 +1,8 @@
+# Ignore all performance test results
+*.json
+*.html
+*.csv
+*.txt
+
+# Keep the .gitkeep file
+!.gitkeep

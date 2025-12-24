@@ -10,9 +10,10 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server ServerConfig
-	Log    LogConfig
-	API    APIConfig
+	Server    ServerConfig
+	Log       LogConfig
+	API       APIConfig
+	Telemetry TelemetryConfig
 }
 
 // ServerConfig holds HTTP server configuration
@@ -35,6 +36,12 @@ type APIConfig struct {
 	Version string
 }
 
+// TelemetryConfig holds observability configuration
+type TelemetryConfig struct {
+	PhoenixEndpoint string
+	ProjectName     string
+}
+
 // Load reads configuration from environment variables
 func Load() (*Config, error) {
 	// Try to load .env file, but don't fail if it doesn't exist
@@ -54,6 +61,10 @@ func Load() (*Config, error) {
 		},
 		API: APIConfig{
 			Version: getEnvOrDefault("API_VERSION", "v1"),
+		},
+		Telemetry: TelemetryConfig{
+			PhoenixEndpoint: getEnvOrDefault("PHOENIX_ENDPOINT", "http://localhost:6006"),
+			ProjectName:     getEnvOrDefault("PHOENIX_PROJECT_NAME", "go-calculator"),
 		},
 	}
 

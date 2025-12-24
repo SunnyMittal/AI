@@ -7,7 +7,11 @@ import (
 	"strconv"
 
 	"github.com/mcp/go-calculator/internal/logger"
+	"github.com/mcp/go-calculator/internal/telemetry"
 	"github.com/mcp/go-calculator/pkg/calculator"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -110,6 +114,16 @@ func (s *Server) registerTools() {
 
 // HandleRequest processes an incoming JSON-RPC request
 func (s *Server) HandleRequest(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+	tracer := telemetry.Tracer("go-calculator")
+	ctx, span := tracer.Start(ctx, "mcp.request",
+		trace.WithAttributes(
+			attribute.String("mcp.method", req.Method),
+			attribute.String("rpc.system", "jsonrpc"),
+			attribute.String("rpc.jsonrpc.version", JSONRPCVersion),
+		),
+	)
+	defer span.End()
+
 	logger.Debug("handling request",
 		zap.String("method", req.Method),
 		zap.Any("id", req.ID),
@@ -117,26 +131,36 @@ func (s *Server) HandleRequest(ctx context.Context, req *JSONRPCRequest) *JSONRP
 
 	switch req.Method {
 	case MethodInitialize:
-		return s.handleInitialize(req)
+		return s.handleInitialize(ctx, req)
 	case MethodToolsList:
-		return s.handleToolsList(req)
+		return s.handleToolsList(ctx, req)
 	case MethodToolsCall:
 		return s.handleToolsCall(ctx, req)
 	default:
 		logger.Warn("method not found", zap.String("method", req.Method))
+		span.SetStatus(codes.Error, "Method not found")
 		return NewJSONRPCError(req.ID, MethodNotFound, "Method not found", nil)
 	}
 }
 
 // handleInitialize processes the initialize request
-func (s *Server) handleInitialize(req *JSONRPCRequest) *JSONRPCResponse {
+func (s *Server) handleInitialize(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+	span := trace.SpanFromContext(ctx)
+
 	var params InitializeParams
 	if len(req.Params) > 0 {
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			logger.Error("failed to parse initialize params", zap.Error(err))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Invalid parameters")
 			return NewJSONRPCError(req.ID, InvalidParams, "Invalid parameters", err.Error())
 		}
 	}
+
+	span.SetAttributes(
+		attribute.String("mcp.client.name", params.ClientInfo.Name),
+		attribute.String("mcp.client.version", params.ClientInfo.Version),
+	)
 
 	logger.Info("initializing MCP server",
 		zap.String("client", params.ClientInfo.Name),
@@ -160,7 +184,10 @@ func (s *Server) handleInitialize(req *JSONRPCRequest) *JSONRPCResponse {
 }
 
 // handleToolsList returns the list of available tools
-func (s *Server) handleToolsList(req *JSONRPCRequest) *JSONRPCResponse {
+func (s *Server) handleToolsList(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(attribute.Int("mcp.tools.count", len(s.tools)))
+
 	logger.Debug("listing tools", zap.Int("count", len(s.tools)))
 
 	result := ToolsListResult{
@@ -172,11 +199,20 @@ func (s *Server) handleToolsList(req *JSONRPCRequest) *JSONRPCResponse {
 
 // handleToolsCall executes a tool call
 func (s *Server) handleToolsCall(ctx context.Context, req *JSONRPCRequest) *JSONRPCResponse {
+	span := trace.SpanFromContext(ctx)
+
 	var params ToolCallParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		logger.Error("failed to parse tool call params", zap.Error(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Invalid parameters")
 		return NewJSONRPCError(req.ID, InvalidParams, "Invalid parameters", err.Error())
 	}
+
+	// Add tool-specific attributes to span
+	span.SetAttributes(
+		attribute.String("mcp.tool.name", params.Name),
+	)
 
 	logger.Info("calling tool",
 		zap.String("tool", params.Name),
@@ -187,12 +223,22 @@ func (s *Server) handleToolsCall(ctx context.Context, req *JSONRPCRequest) *JSON
 	a, b, err := s.extractNumbers(params.Arguments)
 	if err != nil {
 		logger.Error("invalid arguments", zap.Error(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Invalid arguments")
 		return NewJSONRPCError(req.ID, InvalidParams, err.Error(), nil)
 	}
+
+	// Add argument values to span
+	span.SetAttributes(
+		attribute.Float64("mcp.tool.arg.a", a),
+		attribute.Float64("mcp.tool.arg.b", b),
+	)
 
 	// Validate numbers
 	if err := calculator.ValidateNumbers(a, b); err != nil {
 		logger.Error("invalid numbers", zap.Error(err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Invalid numbers")
 		return NewJSONRPCError(req.ID, InvalidParams, err.Error(), nil)
 	}
 
@@ -203,12 +249,20 @@ func (s *Server) handleToolsCall(ctx context.Context, req *JSONRPCRequest) *JSON
 			zap.String("tool", params.Name),
 			zap.Error(err),
 		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Tool execution failed")
+		span.SetAttributes(attribute.Bool("mcp.tool.error", true))
 		return s.toolErrorResponse(req.ID, err)
 	}
 
 	logger.Info("tool execution succeeded",
 		zap.String("tool", params.Name),
 		zap.Float64("result", result),
+	)
+
+	span.SetAttributes(
+		attribute.Float64("mcp.tool.result", result),
+		attribute.Bool("mcp.tool.error", false),
 	)
 
 	return s.toolSuccessResponse(req.ID, result)
