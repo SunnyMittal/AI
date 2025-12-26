@@ -1,12 +1,36 @@
 """MCP server implementation for the calculator."""
 from pathlib import Path
 from typing import Dict, Any
+import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from calculator.calculator import Calculator
+from calculator.telemetry import (
+    initialize_telemetry,
+    initialize_metrics,
+    configure_logging,
+    create_metrics
+)
+
+# Initialize telemetry
+try:
+    # Service name and version will be read from environment variables
+    # (PHOENIX_PROJECT_NAME, OTEL_SERVICE_NAME, SERVICE_VERSION)
+    initialize_telemetry()
+    initialize_metrics()
+    configure_logging()
+    metrics_instruments = create_metrics()
+    logging.info("Telemetry initialized successfully")
+except Exception as e:
+    logging.warning(f"Failed to initialize telemetry: {e}")
+    metrics_instruments = None
 
 # Read sample text file
 RESOURCES_DIR = Path(__file__).parent.parent / "resources"
@@ -33,36 +57,77 @@ sample_text = _load_sample_text()
 @mcp.tool()
 def add(a: float | None = None, b: float | None = None) -> Dict[str, Any]:
     """Add two numbers."""
+    if metrics_instruments:
+        metrics_instruments["tool_call_counter"].add(1, {"tool": "add"})
+
     if a is None or b is None:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "add", "error": "missing_args"})
         return {"error": "Both numbers are required for addition"}
-    result = calculator.calculate("add", a, b)
-    return {"result": result}
+
+    try:
+        result = calculator.calculate("add", a, b)
+        return {"result": result}
+    except Exception as e:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "add", "error": type(e).__name__})
+        raise
 
 @mcp.tool()
 def subtract(a: float | None = None, b: float | None = None) -> Dict[str, Any]:
     """Subtract second number from first number."""
+    if metrics_instruments:
+        metrics_instruments["tool_call_counter"].add(1, {"tool": "subtract"})
+
     if a is None or b is None:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "subtract", "error": "missing_args"})
         return {"error": "Both numbers are required for subtraction"}
-    result = calculator.calculate("subtract", a, b)
-    return {"result": result}
+
+    try:
+        result = calculator.calculate("subtract", a, b)
+        return {"result": result}
+    except Exception as e:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "subtract", "error": type(e).__name__})
+        raise
 
 @mcp.tool()
 def multiply(a: float | None = None, b: float | None = None) -> Dict[str, Any]:
     """Multiply two numbers."""
+    if metrics_instruments:
+        metrics_instruments["tool_call_counter"].add(1, {"tool": "multiply"})
+
     if a is None or b is None:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "multiply", "error": "missing_args"})
         return {"error": "Both numbers are required for multiplication"}
-    result = calculator.calculate("multiply", a, b)
-    return {"result": result}
+
+    try:
+        result = calculator.calculate("multiply", a, b)
+        return {"result": result}
+    except Exception as e:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "multiply", "error": type(e).__name__})
+        raise
 
 @mcp.tool()
 def divide(a: float | None = None, b: float | None = None) -> Dict[str, Any]:
     """Divide first number by second number."""
+    if metrics_instruments:
+        metrics_instruments["tool_call_counter"].add(1, {"tool": "divide"})
+
     if a is None or b is None:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "divide", "error": "missing_args"})
         return {"error": "Both numbers are required for division"}
+
     try:
         result = calculator.calculate("divide", a, b)
         return {"result": result}
     except ValueError as e:
+        if metrics_instruments:
+            metrics_instruments["tool_error_counter"].add(1, {"tool": "divide", "error": "ValueError"})
         return {"error": str(e)}
 
 @mcp.resource("file:///resources/sample.txt")
