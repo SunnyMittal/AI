@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Dict, Any
 import logging
+import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -37,10 +38,16 @@ RESOURCES_DIR = Path(__file__).parent.parent / "resources"
 with open(RESOURCES_DIR / "sample.txt", "r") as f:
     sample_text = f.read()
 
+# Read host and port from environment
+_host = os.getenv("FASTMCP_HOST", "127.0.0.1")
+_port = int(os.getenv("FASTMCP_PORT", "8100"))
+
 # Create FastMCP instance
 mcp = FastMCP(
     "Calculator",
-    instructions="A calculator that performs basic arithmetic operations."
+    instructions="A calculator that performs basic arithmetic operations.",
+    host=_host,
+    port=_port
 )
 
 # Create calculator instance

@@ -9,7 +9,7 @@ Write-Host "MCP Calculator - Quick Test" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 # Configuration
-$SERVER_URL = if ($env:SERVER_URL) { $env:SERVER_URL } else { "http://127.0.0.1:8000" }
+$SERVER_URL = if ($env:SERVER_URL) { $env:SERVER_URL } else { "http://127.0.0.1:8100" }
 $DURATION = if ($env:TEST_DURATION) { $env:TEST_DURATION } else { "30s" }
 $VUS = if ($env:TEST_VUS) { $env:TEST_VUS } else { "5" }
 

@@ -389,7 +389,7 @@ phoenix serve
 PHOENIX_ENDPOINT=http://localhost:6006/v1/traces uv run calculator/server.py
 
 # Make test request
-curl -X POST http://localhost:8000/mcp \
+curl -X POST http://localhost:8100/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add","arguments":{"a":5,"b":3}}}'
 

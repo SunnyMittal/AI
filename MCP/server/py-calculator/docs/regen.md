@@ -146,7 +146,7 @@ Include standard Python ignores:
 
 The server supports these environment variables:
 - `FASTMCP_HOST` - Server host (default: 127.0.0.1)
-- `FASTMCP_PORT` - Server port (default: 8000)
+- `FASTMCP_PORT` - Server port (default: 8100)
 - `FASTMCP_STREAMABLE_HTTP_PATH` - HTTP path (default: /mcp)
 
 ### Running the Server
@@ -179,7 +179,7 @@ uv run pytest
 After regeneration, verify:
 
 - [ ] Server starts without errors: `uv run python -m calculator.server`
-- [ ] Server responds at `http://127.0.0.1:8000/mcp`
+- [ ] Server responds at `http://127.0.0.1:8100/mcp`
 - [ ] All 4 tools are registered (add, subtract, multiply, divide)
 - [ ] Resource is accessible at `file:///resources/sample.txt`
 - [ ] All tests pass: `uv run pytest`

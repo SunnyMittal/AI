@@ -8,7 +8,7 @@ Write-Host "MCP Calculator - Endurance Test" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 # Configuration
-$SERVER_URL = if ($env:SERVER_URL) { $env:SERVER_URL } else { "http://127.0.0.1:8000" }
+$SERVER_URL = if ($env:SERVER_URL) { $env:SERVER_URL } else { "http://127.0.0.1:8100" }
 $RESULTS_DIR = "tests/performance/results"
 $TIMESTAMP = Get-Date -Format "yyyyMMdd-HHmmss"
 $OUTPUT_FILE = "$RESULTS_DIR/endurance-test-$TIMESTAMP.json"

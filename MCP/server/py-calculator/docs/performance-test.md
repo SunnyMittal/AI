@@ -65,7 +65,7 @@ uv run python -m calculator.server
 python -m calculator.server
 ```
 
-The server will start on `http://127.0.0.1:8000` by default.
+The server will start on `http://127.0.0.1:8100` by default.
 
 ### 2. Run Performance Tests
 
@@ -359,11 +359,11 @@ export default function() {
 
 ```bash
 # Windows PowerShell
-$env:SERVER_URL = "http://192.168.1.100:8000"
+$env:SERVER_URL = "http://192.168.1.100:8100"
 .\tests\performance\scripts\run-load-test.ps1
 
 # Linux/macOS
-SERVER_URL=http://192.168.1.100:8000 bash tests/performance/scripts/run-load-test.sh
+SERVER_URL=http://192.168.1.100:8100 bash tests/performance/scripts/run-load-test.sh
 ```
 
 ### Custom Test Duration (Quick Test)
@@ -390,17 +390,17 @@ k6 run --out json=results.json tests/performance/k6/scenarios/load-test.js
 
 ```bash
 # Check if server is running
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8100/health
 
 # Start the server
 uv run python -m calculator.server
 
 # Check port usage
 # Windows PowerShell
-Get-NetTCPConnection -LocalPort 8000
+Get-NetTCPConnection -LocalPort 8100
 
 # Linux/macOS
-lsof -i :8000
+lsof -i :8100
 ```
 
 ### High Error Rates

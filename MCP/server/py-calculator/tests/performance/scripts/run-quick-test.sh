@@ -10,7 +10,7 @@ echo "MCP Calculator - Quick Test"
 echo "========================================"
 
 # Configuration
-SERVER_URL=${SERVER_URL:-"http://127.0.0.1:8000"}
+SERVER_URL=${SERVER_URL:-"http://127.0.0.1:8100"}
 DURATION=${TEST_DURATION:-"30s"}
 VUS=${TEST_VUS:-"5"}
 

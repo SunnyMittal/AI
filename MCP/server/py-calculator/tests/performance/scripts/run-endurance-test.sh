@@ -9,7 +9,7 @@ echo "MCP Calculator - Endurance Test"
 echo "========================================"
 
 # Configuration
-SERVER_URL=${SERVER_URL:-"http://127.0.0.1:8000"}
+SERVER_URL=${SERVER_URL:-"http://127.0.0.1:8100"}
 RESULTS_DIR="tests/performance/results"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 OUTPUT_FILE="$RESULTS_DIR/endurance-test-$TIMESTAMP.json"

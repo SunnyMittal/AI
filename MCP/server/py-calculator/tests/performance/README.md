@@ -144,11 +144,11 @@ tests/performance/
 
 ```bash
 # Windows PowerShell
-$env:SERVER_URL = "http://192.168.1.100:8000"
+$env:SERVER_URL = "http://192.168.1.100:8100"
 .\tests\performance\scripts\run-load-test.ps1
 
 # Linux/macOS
-SERVER_URL=http://192.168.1.100:8000 bash tests/performance/scripts/run-load-test.sh
+SERVER_URL=http://192.168.1.100:8100 bash tests/performance/scripts/run-load-test.sh
 ```
 
 ### Run with Custom Duration and Load
@@ -214,17 +214,17 @@ This indicates performance regression requiring investigation.
 
 ```bash
 # Check server health
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8100/health
 
 # Start the server
 uv run python -m calculator.server
 
 # Check if port is in use
 # Windows
-Get-NetTCPConnection -LocalPort 8000
+Get-NetTCPConnection -LocalPort 8100
 
 # Linux/macOS
-lsof -i :8000
+lsof -i :8100
 ```
 
 ### High Error Rates
