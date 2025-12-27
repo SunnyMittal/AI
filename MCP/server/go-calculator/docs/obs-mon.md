@@ -522,7 +522,7 @@ docker run -p 6006:6006 arizephoenix/phoenix:latest
 PHOENIX_ENDPOINT=http://localhost:6006/v1/traces go run cmd/server/main.go
 
 # Make test request
-curl -X POST http://localhost:8000/mcp \
+curl -X POST http://localhost:8200/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'

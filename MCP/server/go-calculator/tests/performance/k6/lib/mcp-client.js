@@ -8,7 +8,7 @@ const PROTOCOL_VERSION = '2025-03-26';
 const HEADER_SESSION_ID = 'Mcp-Session-Id'; // For response headers (Go canonicalizes)
 
 // Server configuration
-const BASE_URL = __ENV.SERVER_URL || 'http://localhost:8000';
+const BASE_URL = __ENV.SERVER_URL || 'http://localhost:8200';
 const MCP_ENDPOINT = `${BASE_URL}/mcp`;
 
 // Global request ID counter (per VU)

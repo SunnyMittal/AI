@@ -45,7 +45,7 @@ jobs:
           sleep 3
 
       - name: Verify server is running
-        run: curl -f http://localhost:8000/health
+        run: curl -f http://localhost:8200/health
 
       - name: Run quick performance check
         run: make perf-quick

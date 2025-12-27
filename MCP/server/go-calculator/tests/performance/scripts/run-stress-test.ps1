@@ -50,7 +50,7 @@ try {
     while ($WaitCount -lt $MaxWait) {
         try {
             # Use curl.exe (not PowerShell alias) for reliable HTTP checks
-            $result = & curl.exe -s -o NUL -w "%{http_code}" "http://127.0.0.1:8000/health" 2>$null
+            $result = & curl.exe -s -o NUL -w "%{http_code}" "http://127.0.0.1:8200/health" 2>$null
             if ($result -eq "200") {
                 Write-Host ""
                 Write-Host "Server is ready" -ForegroundColor Green

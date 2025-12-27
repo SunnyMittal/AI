@@ -258,7 +258,7 @@ type LogConfig struct {
 
 **Environment Variables with Defaults:**
 - `SERVER_HOST=localhost`
-- `SERVER_PORT=8000`
+- `SERVER_PORT=8200`
 - `SERVER_READ_TIMEOUT=15s`
 - `SERVER_WRITE_TIMEOUT=15s`
 - `SERVER_IDLE_TIMEOUT=60s`
@@ -681,7 +681,7 @@ func run() int {
 
 **.env.example:**
 ```
-SERVER_PORT=8000
+SERVER_PORT=8200
 SERVER_HOST=localhost
 SERVER_READ_TIMEOUT=15s
 SERVER_WRITE_TIMEOUT=15s
@@ -809,7 +809,7 @@ Before considering implementation complete, verify:
 - [ ] Benchmarks run successfully: `go test -bench=. ./...`
 - [ ] Code builds: `go build ./...`
 - [ ] Server starts and listens on configured port
-- [ ] Health endpoint returns 200: `curl http://localhost:8000/health`
+- [ ] Health endpoint returns 200: `curl http://localhost:8200/health`
 - [ ] Metrics endpoint returns active connections
 - [ ] Initialize request creates session and returns session ID
 - [ ] Tools/list requires valid session
@@ -861,13 +861,13 @@ go build -o bin/server cmd/server/main.go
 ./bin/server
 
 # Test health endpoint
-curl http://localhost:8000/health
+curl http://localhost:8200/health
 
 # Test metrics
-curl http://localhost:8000/metrics
+curl http://localhost:8200/metrics
 
 # Test initialize (should create session)
-curl -X POST http://localhost:8000/mcp \
+curl -X POST http://localhost:8200/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' \

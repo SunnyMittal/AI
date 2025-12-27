@@ -57,7 +57,7 @@ echo "Waiting for server to be ready..."
 MAX_WAIT=30
 WAIT_COUNT=0
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-    if curl -s -f http://localhost:8000/health > /dev/null 2>&1; then
+    if curl -s -f http://localhost:8200/health > /dev/null 2>&1; then
         echo -e "${GREEN}✓ Server is ready${NC}"
         break
     fi

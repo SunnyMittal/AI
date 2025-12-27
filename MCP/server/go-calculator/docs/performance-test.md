@@ -275,7 +275,7 @@ This indicates performance regression that needs investigation.
 ### Custom Server URL
 
 ```bash
-SERVER_URL=http://192.168.1.100:8000 k6 run tests/performance/k6/scenarios/load-test.js
+SERVER_URL=http://192.168.1.100:8200 k6 run tests/performance/k6/scenarios/load-test.js
 ```
 
 ### Custom Test Duration
@@ -446,14 +446,14 @@ CI will warn if:
 
 ```bash
 # Check server is running
-curl http://localhost:8000/health
+curl http://localhost:8200/health
 
 # Check server logs
 ./bin/calculator-server
 
 # Verify port is not in use
-netstat -ano | findstr :8000  # Windows
-lsof -i :8000                 # Linux/macOS
+netstat -ano | findstr :8200  # Windows
+lsof -i :8200                 # Linux/macOS
 ```
 
 ### High Error Rates
@@ -518,4 +518,4 @@ For issues or questions:
 - Check existing GitHub issues
 - Review server logs: `./bin/calculator-server`
 - Examine k6 output for detailed error messages
-- Verify server health: `curl http://localhost:8000/health`
+- Verify server health: `curl http://localhost:8200/health`

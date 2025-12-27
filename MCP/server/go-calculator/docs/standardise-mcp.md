@@ -62,7 +62,7 @@ Returns 406 Not Acceptable if missing.
 
 To use the Go server, set in client `.env`:
 ```
-MCP_SERVER_URL=http://127.0.0.1:8000/mcp
+MCP_SERVER_URL=http://127.0.0.1:8200/mcp
 ```
 
 Both Python and Go servers now use the same endpoint format.

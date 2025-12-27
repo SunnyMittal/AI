@@ -38,7 +38,7 @@ Ensure you have:
 
 3. **Test the server:**
    ```bash
-   curl http://localhost:8000/health
+   curl http://localhost:8200/health
    ```
 
 ## Configuration
@@ -49,7 +49,7 @@ Create a `.env` file in the project root:
 
 ```bash
 # Server settings
-SERVER_PORT=8000
+SERVER_PORT=8200
 SERVER_HOST=localhost
 SERVER_READ_TIMEOUT=15s
 SERVER_WRITE_TIMEOUT=15s
@@ -142,12 +142,12 @@ rm -rf bin coverage.out coverage.html
 
 #### Health Check
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8200/health
 ```
 
 #### Initialize MCP Session
 ```bash
-curl -X POST http://localhost:8000/mcp/v1/messages \
+curl -X POST http://localhost:8200/mcp/v1/messages \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -166,7 +166,7 @@ curl -X POST http://localhost:8000/mcp/v1/messages \
 
 #### List Tools
 ```bash
-curl -X POST http://localhost:8000/mcp/v1/messages \
+curl -X POST http://localhost:8200/mcp/v1/messages \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -177,7 +177,7 @@ curl -X POST http://localhost:8000/mcp/v1/messages \
 
 #### Call Tool (Add)
 ```bash
-curl -X POST http://localhost:8000/mcp/v1/messages \
+curl -X POST http://localhost:8200/mcp/v1/messages \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -214,7 +214,7 @@ python examples/example_client.py
 const fetch = require('node-fetch');
 
 async function callTool(name, args) {
-  const response = await fetch('http://localhost:8000/mcp/v1/messages', {
+  const response = await fetch('http://localhost:8200/mcp/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -238,7 +238,7 @@ import requests
 
 def call_tool(name, args):
     response = requests.post(
-        'http://localhost:8000/mcp/v1/messages',
+        'http://localhost:8200/mcp/v1/messages',
         json={
             'jsonrpc': '2.0',
             'id': 1,
@@ -283,7 +283,7 @@ func callTool(name string, args map[string]float64) (map[string]interface{}, err
 
     body, _ := json.Marshal(req)
     resp, err := http.Post(
-        "http://localhost:8000/mcp/v1/messages",
+        "http://localhost:8200/mcp/v1/messages",
         "application/json",
         bytes.NewReader(body),
     )
@@ -463,7 +463,7 @@ LOG_ENCODING=console go run cmd/server/main.go
 
 Check metrics:
 ```bash
-curl http://localhost:8000/metrics | jq '.'
+curl http://localhost:8200/metrics | jq '.'
 ```
 
 Response:
@@ -478,10 +478,10 @@ Response:
 
 ```bash
 # Simple health check
-curl http://localhost:8000/health
+curl http://localhost:8200/health
 
 # With monitoring tools
-watch -n 5 'curl -s http://localhost:8000/health | jq .'
+watch -n 5 'curl -s http://localhost:8200/health | jq .'
 ```
 
 ### Log Analysis
@@ -520,7 +520,7 @@ ExecStart=/opt/calculator/bin/calculator-server
 Restart=always
 RestartSec=5
 Environment=LOG_LEVEL=info
-Environment=SERVER_PORT=8000
+Environment=SERVER_PORT=8200
 
 [Install]
 WantedBy=multi-user.target
@@ -544,7 +544,7 @@ Run container:
 ```bash
 docker run -d \
   --name calculator \
-  -p 8000:8000 \
+  -p 8200:8200 \
   -e LOG_LEVEL=info \
   --restart unless-stopped \
   calculator-server
@@ -559,13 +559,13 @@ services:
   calculator:
     build: .
     ports:
-      - "8000:8000"
+      - "8200:8200"
     environment:
       - LOG_LEVEL=info
-      - SERVER_PORT=8000
+      - SERVER_PORT=8200
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -581,7 +581,7 @@ docker-compose up -d
 Nginx configuration:
 ```nginx
 upstream calculator {
-    server localhost:8000;
+    server localhost:8200;
 }
 
 server {
@@ -617,10 +617,10 @@ sudo certbot --nginx -d calculator.example.com
 **Check port availability:**
 ```bash
 # Linux/Mac
-lsof -i :8000
+lsof -i :8200
 
 # Windows
-netstat -ano | findstr :8000
+netstat -ano | findstr :8200
 ```
 
 **Check logs:**
@@ -641,15 +641,15 @@ watch -n 1 'ps aux | grep calculator-server'
 
 **Profile memory:**
 ```bash
-go tool pprof http://localhost:8000/debug/pprof/heap
+go tool pprof http://localhost:8200/debug/pprof/heap
 ```
 
 ### Connection Issues
 
 **Test connectivity:**
 ```bash
-telnet localhost 8000
-nc -zv localhost 8000
+telnet localhost 8200
+nc -zv localhost 8200
 ```
 
 **Check firewall:**
@@ -659,7 +659,7 @@ sudo ufw status
 sudo iptables -L
 
 # Allow port
-sudo ufw allow 8000
+sudo ufw allow 8200
 ```
 
 ## Best Practices

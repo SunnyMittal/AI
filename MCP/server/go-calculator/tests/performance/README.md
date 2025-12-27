@@ -199,12 +199,12 @@ bash tests/performance/scripts/compare-results.sh
 
 Windows:
 ```powershell
-curl.exe http://localhost:8000/health
+curl.exe http://localhost:8200/health
 ```
 
 Linux/macOS:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8200/health
 ```
 
 **k6 not installed**:
