@@ -73,6 +73,7 @@ class Calculator:
                 result = self._operations[operation].execute(a, b)
                 span.set_attribute("mcp.tool.result", float(result))
                 span.set_attribute("mcp.tool.error", False)
+                span.set_status(Status(StatusCode.OK))
                 return result
             except Exception as e:
                 span.set_status(Status(StatusCode.ERROR))

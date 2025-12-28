@@ -1,0 +1,20 @@
+# Kong runtime directories (writable volumes for read-only container)
+prefix_volume/
+tmp_volume/
+
+# Environment files with secrets
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log

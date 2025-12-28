@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(docker exec kong-gateway-readonly wget -qO- --timeout=5 http://host.docker.internal:8100/health)",
+      "Bash(powershell:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker logs:*)"
+    ]
+  }
+}
