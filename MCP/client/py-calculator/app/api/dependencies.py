@@ -6,7 +6,8 @@ from typing import AsyncGenerator
 
 from app.config import Settings, get_settings
 from app.infrastructure.mcp_client import HttpMCPClient, StdioMCPClient
-from app.infrastructure.ollama_client import OllamaClientImpl
+from app.infrastructure.ollama_client_instrumented import InstrumentedOllamaClient
+from app.infrastructure.telemetry import initialize_telemetry
 from app.infrastructure.tool_registry import ToolRegistry
 from app.services.chat_service import ChatService
 from app.services.conversation_manager import ConversationManager
@@ -14,9 +15,10 @@ from app.services.conversation_manager import ConversationManager
 logger = logging.getLogger(__name__)
 
 _mcp_client: HttpMCPClient | StdioMCPClient | None = None
-_ollama_client: OllamaClientImpl | None = None
+_ollama_client: InstrumentedOllamaClient | None = None
 _tool_registry: ToolRegistry | None = None
 _chat_service: ChatService | None = None
+_telemetry_initialized: bool = False
 
 
 def get_mcp_client(settings: Settings | None = None) -> HttpMCPClient | StdioMCPClient:
@@ -41,26 +43,35 @@ def get_mcp_client(settings: Settings | None = None) -> HttpMCPClient | StdioMCP
     return _mcp_client
 
 
-def get_ollama_client(settings: Settings | None = None) -> OllamaClientImpl:
-    """Get or create the Ollama client singleton.
+def get_ollama_client(settings: Settings | None = None) -> InstrumentedOllamaClient:
+    """Get or create the instrumented Ollama client singleton.
 
     Args:
         settings: Application settings
 
     Returns:
-        Ollama client instance
+        Instrumented Ollama client instance
     """
-    global _ollama_client
+    global _ollama_client, _telemetry_initialized
 
     if _ollama_client is None:
         if settings is None:
             settings = get_settings()
 
-        _ollama_client = OllamaClientImpl(
+        # Initialize telemetry if not already done
+        if not _telemetry_initialized:
+            try:
+                initialize_telemetry()
+                _telemetry_initialized = True
+                logger.info("OpenTelemetry initialized for Ollama client")
+            except Exception as e:
+                logger.warning(f"Failed to initialize telemetry: {e}")
+
+        _ollama_client = InstrumentedOllamaClient(
             host=settings.ollama_host,
             model=settings.ollama_model,
         )
-        logger.info("Created Ollama client instance")
+        logger.info("Created instrumented Ollama client instance")
 
     return _ollama_client
 
@@ -133,7 +144,7 @@ async def initialize_services() -> None:
 async def shutdown_services() -> None:
     """Shutdown all services at application shutdown."""
     logger.info("Shutting down application services")
-    global _chat_service, _mcp_client, _ollama_client, _tool_registry
+    global _chat_service, _mcp_client, _ollama_client, _tool_registry, _telemetry_initialized
 
     if _chat_service:
         await _chat_service.shutdown()
@@ -142,5 +153,6 @@ async def shutdown_services() -> None:
     _mcp_client = None
     _ollama_client = None
     _tool_registry = None
+    _telemetry_initialized = False
 
     logger.info("Application services shut down successfully")

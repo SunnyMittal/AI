@@ -139,6 +139,12 @@ If `llama3.1:8b` is not listed, pull it:
 ollama pull llama3.1:8b
 ```
 
+Verify the model is running
+
+```powershell
+curl http://localhost:11434/api/tags
+```
+
 ### 3. Start the Web Client
 
 ```bash
