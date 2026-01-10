@@ -86,10 +86,21 @@ func Initialize(ctx context.Context, cfg Config) (func(context.Context) error, e
 		return nil, fmt.Errorf("Phoenix project check failed: %w", err)
 	}
 
-	// Parse endpoint to get host (remove protocol and path)
+	// Parse endpoint URL to extract host and path
 	endpoint := cfg.PhoenixEndpoint
+	isSecure := strings.HasPrefix(endpoint, "https://")
 	endpoint = strings.TrimPrefix(endpoint, "http://")
 	endpoint = strings.TrimPrefix(endpoint, "https://")
+
+	// Split host:port from path
+	host := endpoint
+	urlPath := "/v1/traces"
+	if idx := strings.Index(endpoint, "/"); idx != -1 {
+		host = endpoint[:idx]
+		basePath := endpoint[idx:]
+		// Append /v1/traces to any base path (e.g., /phoenix -> /phoenix/v1/traces)
+		urlPath = strings.TrimSuffix(basePath, "/") + "/v1/traces"
+	}
 
 	// Create OTLP HTTP exporter with Phoenix project header
 	headers := map[string]string{}
@@ -97,12 +108,16 @@ func Initialize(ctx context.Context, cfg Config) (func(context.Context) error, e
 		headers["x-project-name"] = cfg.ProjectName
 	}
 
-	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint(endpoint),
-		otlptracehttp.WithURLPath("/v1/traces"),
-		otlptracehttp.WithInsecure(),
+	opts := []otlptracehttp.Option{
+		otlptracehttp.WithEndpoint(host),
+		otlptracehttp.WithURLPath(urlPath),
 		otlptracehttp.WithHeaders(headers),
-	)
+	}
+	if !isSecure {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+
+	exporter, err := otlptracehttp.New(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
